@@ -1,0 +1,355 @@
+#include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <vector>
+
+using namespace std;
+
+//****************************************************************************
+// Global definitions visible to all methods and classes
+//****************************************************************************
+
+// define a structure to hold course information
+struct Course {
+    string courseNumber; // unique identifier
+    string name;
+    vector<string> prerequisite;
+    Course() {
+        courseNumber = "empty";
+    }
+};
+
+// Internal structure for tree node
+struct Node {
+    Course course;
+
+    string key;  // Stores the courseNumner as a key
+    Node* left;  // Pointer to the left child
+    Node* right;  // Pointer to the right child
+
+    // Default constructor
+    Node() {
+        left = nullptr;
+        right = nullptr;
+    }
+
+    // Conctructor which sets course inforamtion and key
+    Node(Course newCourse) : Node() {
+        this->course = newCourse;
+        key = this->course.courseNumber;
+    }
+
+    // Destrctor which will iterate through all nodes
+    ~Node() {
+        delete left;
+        delete right;
+    }
+};
+
+//****************************************************************************
+// Class definitions, constructors, destructor, and methods
+//****************************************************************************
+
+/**
+ * Define a class containing data members and methods to
+ * implement a binary search tree
+ */
+class BinarySearchTree {
+    private:
+        Node* root;
+
+        void addNode(Node* node, Course course);
+        void printAllCourses(Node* node);
+
+    public:
+        BinarySearchTree();
+        virtual ~BinarySearchTree();
+        void PrintAllCourses();
+        void Insert(Course course);
+        Course Search(string courseNumber);
+};
+
+/**
+ * Default constructor
+ */
+BinarySearchTree::BinarySearchTree() {
+    root = nullptr;  // Initialize the root pointer to null
+}
+
+/**
+ * Destructor
+ */
+BinarySearchTree::~BinarySearchTree() {
+    delete root; // Will trigger the Node destructor to delete children recursively
+}
+
+/**
+ * Traverse the tree in lowest to highest order (left, parent, right)
+ */
+void BinarySearchTree::PrintAllCourses() {
+    this->printAllCourses(root);  // Call the private printAllCourses function
+}
+
+/**
+ * Insert a course
+ */
+void BinarySearchTree::Insert(Course course) {
+    //  If the tree is empty, insert as root
+    if (root == nullptr) {
+        // root is equal to new node course
+        root = new Node(course);
+        root->left = nullptr;
+        root->right = nullptr;
+    }
+    // Tree already has nodes
+    else {
+        //  Call the privte addNode function
+        this->addNode(root, course);
+    }
+}
+
+/**
+ * Search for a course
+ */
+Course BinarySearchTree::Search(string courseNumber) {
+    //  Create a pointer and set it to the root node
+    Node* current = root;
+    // keep looping downwards until bottom reached or matching courseNumber found
+    while (current != nullptr) {
+        // Course is found
+        if (courseNumber == current->course.courseNumber) {
+            return current->course;  // Return the course
+        }
+        // Course number is less than current node
+        else if (courseNumber < current->course.courseNumber) {
+            current = current->left;  // Traverse left
+        }
+        //  Course number is greater than current node
+        else {
+            current = current->right;  // Traverse right
+        }
+    }
+    Course course;
+    return course;  // Course not found, return an empty course
+}
+
+/**
+ * Add a course to some node (recursive)
+ *
+ * @param node Current node in tree
+ * @param course Couse to be added
+ */
+void BinarySearchTree::addNode(Node* node, Course course) {
+    //  Course is smaller than the current node
+    if (course.courseNumber < node->key) {
+        //  Traverse left
+        if (node->left == nullptr) {
+            //  No more children to traverse, add node
+            node->left = new Node(course);
+        }
+        else {
+            //  Traverse to the left child recursively
+            this->addNode(node->left, course);
+        }
+    }
+    //  Course is larger than the current node
+    else {
+        //  Traverse right
+        if (node->right == nullptr) {
+            //  No more children to traverse, add node
+            node->right = new Node(course);
+        }
+        else {
+            //  Traverse to the right child recursively
+            this->addNode(node->right, course);
+        }
+    }
+}
+
+void BinarySearchTree::printAllCourses(Node* node) {
+    if (node != nullptr) {
+        //  Recursively traverse left
+        printAllCourses(node->left);
+
+        //  Output current node's course information
+        cout << node->course.courseNumber << ": " << node->course.name << endl;
+
+        //  Recursively traverse right
+        printAllCourses(node->right);
+    }
+}
+
+//****************************************************************************
+// Static methods
+//****************************************************************************
+
+/**
+ * Display the course information to the console
+ *
+ * @param course struct containing the course info
+ */
+void displayCourse(Course course) {
+    // Pring the course number and name
+    cout << course.courseNumber << ", " << course.name << endl;
+
+    cout << "Prerequisites: ";
+    // Check if the course has prerequisites
+    if (course.prerequisite.size() > 0) {
+        // Iterate through the vector of prerequisites and print
+        for (unsigned int i = 0; i < course.prerequisite.size(); ++i) {
+            cout << course.prerequisite.at(i);
+            if (i < (course.prerequisite.size() - 1)) {
+                cout << ", ";
+            }
+        }
+    }
+    // Print that the course has no prerequisites
+    else {
+        cout << "none";
+    }
+    cout << endl;
+    return;
+}
+
+/**
+ * Load a CSV file containing course information into a container
+ *
+ * @param csvPath the path to the CSV file to load
+ * @return a container holding all the courses read
+ */
+void loadTree(string csvPath, BinarySearchTree* bst) {
+    cout << "Loading CSV file " << csvPath << endl;
+
+    ifstream inFile;
+    string line, section, userInput;
+    vector<string> courseList, prereqList;
+    int index = 0;
+    
+    // Open the stream with the path passed by the user
+    inFile.open(csvPath);
+    // Check if the file opened
+    if (!inFile.is_open()) {
+        cout << "Error opening file." << endl;
+        // Exit the mehtod if the file failed to open
+        return;
+    }
+    
+    // Loop through the file by line
+    while (getline(inFile, line)) {
+        // Convert the line to a stringstream for parsing
+        stringstream temp(line);
+        Course newCourse;
+        // Create an index for identifying elements of the line
+        index = 0;
+
+        // Iterate through the stringstream delimited by commas
+        while (getline(temp, section, ',')) {
+            // Course number
+            if (index == 0) {
+                newCourse.courseNumber = section;
+                courseList.push_back(section);
+                index += 1;
+            }
+            // Course name
+            else if (index == 1) {
+                newCourse.name = section;
+                index += 1;
+            }
+            // Prerequisites
+            else if (index >= 2 && section != "") {
+                
+                newCourse.prerequisite.push_back(section);
+                prereqList.push_back(section);
+                index += 1;
+            }
+        }
+        // Check that the line had at least two elements (number and name)
+        if (index < 2) {
+            cout << "File error." << endl;
+            return;
+        }
+        // Insert the course into the bst
+        bst->Insert(newCourse);
+    }
+
+    // Check that all the listed prerequsites exist as courses
+    for (unsigned int i = 0; i < prereqList.size(); ++i) {
+        // Check that the course list contains the prerequisite
+        if (find(courseList.begin(), courseList.end(), prereqList.at(i)) == courseList.end()) {
+            cout << "Prerequisite " << prereqList.at(i) << " not on schedule." << endl;
+        }
+    }
+    cout << endl;
+    inFile.close();
+}
+
+/**
+ * The main() method
+ */
+int main() {
+
+    // Default Path = ABCU_Advising_Program_Input.csv
+
+    // Define a binary search tree to hold all courses
+    BinarySearchTree* bst = new BinarySearchTree();
+
+    Course course;
+    string userInput;
+    int choice = 0;
+
+    while (choice != 9) {
+        cout << "What would you like to do?" << endl;
+        cout << endl;
+        cout << "  1. Load Data Structure" << endl;
+        cout << "  2. Print Course List" << endl;
+        cout << "  3. Display Course Information" << endl;
+        cout << "  9. Exit" << endl;
+        cout << endl;
+        cout << "What would you like to do? ";
+        cin >> choice;
+        cout << endl;
+
+        switch (choice) {
+        
+        // Load Data Structure
+        case 1:
+            bst = new BinarySearchTree();
+            cout << "What file would you like to load? ";
+            cin >> userInput;
+            
+            loadTree(userInput, bst);
+
+            break;
+
+        // Print entire course list
+        case 2:
+            cout << "Here is a sample schedule: " << endl;
+            cout << endl;
+            bst->PrintAllCourses();
+            cout << endl;
+            break;
+
+        // Print single course info
+        case 3:
+            cout << "What course do you want to know about? ";
+            cin >> userInput;
+            transform(userInput.begin(), userInput.end(), userInput.begin(), ::toupper);
+            course = bst->Search(userInput);
+
+            if (course.courseNumber != "empty") {
+                cout << endl;
+                displayCourse(course);
+                cout << endl;
+            }
+            else {
+                cout << "\nCourse " << userInput << " not found." << endl;
+            }
+            break;
+        }
+    }
+
+    cout << "Good bye." << endl;
+    return 0;
+}
